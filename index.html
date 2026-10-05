@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>School Gate Live Scanner</title>
+    <!-- Tailwind CSS -->
+    <script src="https://tailwindcss.com"></script>
+    <!-- HTML5-QR Code Scanner Library -->
+    <script src="https://unpkg.com"></script>
+    <!-- Supabase Cloud CDN -->
+    <script src="https://jsdelivr.net"></script>
+</head>
+<body class="bg-gray-900 text-white font-sans min-h-screen flex flex-col justify-between">
+
+    <header class="p-4 bg-gray-800 text-center border-b border-gray-700 shadow-md">
+        <h1 class="text-xl font-bold tracking-wide">🛡️ Live Campus Gate Scanner</h1>
+    </header>
+
+    <main id="display-screen" class="flex-1 flex flex-col items-center justify-center p-6 transition-all duration-300 bg-gray-900">
+        
+        <!-- Loading State Spinner -->
+        <div id="loading-spinner" class="hidden text-center space-y-4">
+            <div class="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-white mx-auto"></div>
+            <p class="text-lg font-semibold animate-pulse">Checking Online Database...</p>
+        </div>
+
+        <!-- Camera Scanner Element -->
+        <div id="scanner-wrapper" class="w-full max-w-md bg-black rounded-2xl overflow-hidden shadow-2xl border border-gray-700 relative">
+            <div id="reader" class="w-full"></div>
+        </div>
+
+        <!-- Student Info View Card (GREEN SUCCESS) -->
+        <div id="result-card" class="hidden w-full max-w-md p-6 bg-white text-gray-900 rounded-3xl shadow-2xl text-center space-y-4">
+            <img id="student-photo" src="" alt="Student Profile" class="w-40 h-40 rounded-full mx-auto object-cover border-4 border-emerald-500 shadow-md">
+            <div>
+                <h2 id="student-name" class="text-2xl font-black uppercase tracking-tight"></h2>
+                <p id="student-id" class="text-gray-500 font-semibold"></p>
+                <p id="student-class" class="text-lg font-bold text-emerald-600 mt-1"></p>
+            </div>
+        </div>
+
+        <!-- Alert Error Message (RED FAIL) -->
+        <div id="error-message" class="hidden text-center space-y-2 max-w-md w-full p-6 text-white">
+            <span class="text-7xl block animate-bounce">🚫</span>
+            <h2 id="error-text" class="text-4xl font-black uppercase tracking-wide drop-shadow"></h2>
+            <p id="error-subtext" class="text-lg font-medium text-white/90 mt-2"></p>
+        </div>
+
+        <!-- Reset Button to scan next student -->
+        <button id="reset-btn" class="hidden mt-8 px-8 py-4 bg-black/50 hover:bg-black/70 rounded-full backdrop-blur-md text-sm font-bold tracking-wider uppercase border border-white/30 transition-all active:scale-95 shadow-lg">
+            🔄 Tap to Scan Next Student
+        </button>
+    </main>
+
+    <script>
+        // Initialize Supabase Client
+        const SUPABASE_URL = "YOUR_SUPABASE_URL"; 
+        const SUPABASE_ANON_KEY = "YOUR_SUPABASE_ANON_KEY";
+        const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        // Core UI Elements
+        const displayScreen = document.getElementById('display-screen');
+        const scannerWrapper = document.getElementById('scanner-wrapper');
+        const resultCard = document.getElementById('result-card');
+        const errorMessage = document.getElementById('error-message');
+        const errorText = document.getElementById('error-text');
+        const errorSubtext = document.getElementById('error-subtext');
+        const resetBtn = document.getElementById('reset-btn');
+        const loadingSpinner = document.getElementById('loading-spinner');
+
+        const html5QrCode = new Html5QrCode("reader");
+        const qrConfig = { fps: 15, qrbox: { width: 260, height: 260 } };
+
+        function startScanning() {
+            // Reset App Interface state
+            displayScreen.className = "flex-1 flex flex-col items-center justify-center p-6 transition-all duration-300 bg-gray-900";
+            scannerWrapper.classList.remove('hidden');
+            resultCard.classList.add('hidden');
+            errorMessage.classList.add('hidden');
+            resetBtn.classList.add('hidden');
+            loadingSpinner.classList.add('hidden');
+
+            html5QrCode.start(
+                { facingMode: "environment" }, // Focuses back lens on iOS and iPadOS devices
+                qrConfig,
+                onScanSuccess
+            ).catch(err => console.error("Camera access failed:", err));
+        }
+
+        async function onScanSuccess(decodedText) {
+            // Freeze scanner immediately to manage backend pipeline
+            await html5QrCode.stop();
+            scannerWrapper.classList.add('hidden');
+            loadingSpinner.classList.remove('hidden');
+
+            try {
+                // Generate Dynamic Today Key (Format: YYYY-MM-DD)
+                const todayDateString = new Date().toISOString().split('T')[0];
+                const uniqueScanKey = `${decodedText}_${todayDateString}`;
+
+                // Requirement 4: Query Master Roster to see if student exists
+                const { data: student, error: studentError } = await supabase
+                    .from('students')
+                    .select('*')
+                    .eq('id', decodedText)
+                    .single();
+
+                if (studentError || !student) {
+                    showError("NOT ALLOWED", "This QR code / Student ID is not registered in the school database.");
+                    return;
+                }
+
+                // Requirement 5: Check if the Unique Scan Key already exists for today
+                const { data: existingScan, error: scanCheckError } = await supabase
+                    .from('daily_scans')
+                    .select('scan_key')
+                    .eq('scan_key', uniqueScanKey)
+                    .maybeSingle();
+
+                if (existingScan) {
+                    showError("ALREADY USED TODAY", `${student.name} has already entered campus today.`);
+                    return;
+                }
+
+                // Requirement 3: Success Pathway -> Register scan into online cloud database
+                const { error: insertError } = await supabase
+                    .from('daily_scans')
+                    .insert([{ scan_key: uniqueScanKey, student_id: decodedText }]);
+
+                if (insertError) throw insertError;
+
+                // Render Green Success Screen
+                loadingSpinner.classList.add('hidden');
+                displayScreen.classList.replace('bg-gray-900', 'bg-emerald-600');
+                resultCard.classList.remove('hidden');
+                resetBtn.classList.remove('hidden');
+
+                document.getElementById('student-photo').src = student.photo_url;
+                document.getElementById('student-name').innerText = student.name;
+                document.getElementById('student-id').innerText = `ID: ${student.id}`;
+                document.getElementById('student-class').innerText = student.class;
+
+            } catch (err) {
+                console.error("Database connection fault: ", err);
+                showError("NETWORK ERROR", "Failed to connect to the cloud database. Check internet connection.");
+            }
+        }
+
+        function showError(mainMessage, subMessage) {
+            loadingSpinner.classList.add('hidden');
+            displayScreen.classList.replace('bg-gray-900', 'bg-red-600');
+            errorMessage.classList.remove('hidden');
+            resetBtn.classList.remove('hidden');
+            
+            errorText.innerText = mainMessage;
+            errorSubtext.innerText = subMessage;
+        }
+
+        resetBtn.addEventListener('click', startScanning);
+        window.addEventListener('DOMContentLoaded', startScanning);
+    </script>
+</body>
+</html>
