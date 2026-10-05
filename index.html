@@ -8,8 +8,6 @@
     <script src="https://tailwindcss.com"></script>
     <!-- HTML5-QR Code Scanner Library -->
     <script src="https://unpkg.com"></script>
-    <!-- Supabase Cloud Library Bundle -->
-    <script src="https://jsdelivr.net"></script>
 </head>
 <body class="bg-gray-900 text-white font-sans min-h-screen flex flex-col justify-between">
 
@@ -64,17 +62,13 @@
                 <h1 style="font-size:3rem;">⚠️ Code Crash!</h1>
                 <p style="font-size:1.2rem; margin-top:20px;"><b>Error Detail:</b> ${message}</p>
                 <p style="font-size:1.2rem;"><b>Error Line Number:</b> ${lineno}</p>
-                <p style="margin-top:30px; opacity:0.7;">If this is the same error, your mobile browser is cached. Try incognito window!</p>
             </div>`;
             return false;
         };
 
-        // Initialize Supabase Cloud Connections
+        // Database Credentials Integration Parameters Configuration
         const SUPABASE_URL = "https://llkiqbiyiibbbbxjuwmy.supabase.co"; 
         const SUPABASE_ANON_KEY = "sb_publishable_iKOVQNSp5jEzcJKz-eym1A_k6eSD4Pq"; // Put your long key inside these quotes
-
-        // Boot client database service instance using capital 'Supabase' object
-        const supabase = Supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
         // Map core layout presentation node targets out from documents DOM
         const displayScreen = document.getElementById('display-screen');
@@ -91,7 +85,6 @@
         const qrConfig = { fps: 15, qrbox: { width: 260, height: 260 } };
 
         function startScanning() {
-            // Restore window view layouts back down to raw initial dashboard metrics
             displayScreen.className = "flex-1 flex flex-col items-center justify-center p-6 transition-all duration-300 bg-gray-900";
             scannerWrapper.classList.remove('hidden');
             resultCard.classList.add('hidden');
@@ -99,71 +92,72 @@
             resetBtn.classList.add('hidden');
             loadingSpinner.classList.add('hidden');
 
-            // Force browser engine interface system platform tool initialization
             html5QrCode.start(
-                { facingMode: "environment" }, // Instructs iPad or smart devices to target primary rear array layout lens
+                { facingMode: "environment" }, 
                 qrConfig,
                 onScanSuccess
-            ).catch(err => console.error("Camera access fault metrics tracker flag: ", err));
+            ).catch(err => console.error("Camera access fault: ", err));
+        }
+
+        // Direct Native Online Cloud Database Query Engine Pipeline Function Handler
+        async function supabaseFetch(endpoint, options = {}) {
+            const headers = {
+                "apikey": SUPABASE_ANON_KEY,
+                "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
+                "Content-Type": "application/json",
+                "Prefer": "return=representation"
+            };
+            const response = await fetch(`${SUPABASE_URL}/rest/v1/${endpoint}`, { ...options, headers });
+            if (!response.ok) throw new Error(`Database Error: ${response.statusText}`);
+            return response.json();
         }
 
         async function onScanSuccess(decodedText) {
-            // Cut off hardware video captures immediately upon registration hitting bounds
             await html5QrCode.stop();
             scannerWrapper.classList.add('hidden');
             loadingSpinner.classList.remove('hidden');
 
             try {
-                // Compute distinct localized modern timestamps data bounds constraints keys definitions
                 const todayDateString = new Date().toISOString().split('T')[0];
                 const uniqueScanKey = `${decodedText}_${todayDateString}`;
 
-                // Rule 4 validation: Check master matrix if student key exists
-                const { data: student, error: studentError } = await supabase
-                    .from('students')
-                    .select('*')
-                    .eq('id', decodedText)
-                    .single();
+                // Rule 4: Query master roster table using direct native network fetch
+                const studentRecords = await supabaseFetch(`students?id=eq.${encodeURIComponent(decodedText)}`);
+                const student = studentRecords[0];
 
-                if (studentError || !student) {
+                if (!student) {
                     showError("NOT ALLOWED", "This QR code / Student ID is not registered in the school database.");
                     return;
                 }
 
-                // Rule 5 verification: Pull match bounds flags down to test daily duplicate counts
-                const { data: existingScan, error: scanCheckError } = await supabase
-                    .from('daily_scans')
-                    .select('scan_key')
-                    .eq('scan_key', uniqueScanKey)
-                    .maybeSingle();
-
-                if (existingScan) {
+                // Rule 5: Check daily log tables using direct lookup filter matching strings
+                const scanLogRecords = await supabaseFetch(`daily_scans?scan_key=eq.${encodeURIComponent(uniqueScanKey)}`);
+                
+                if (scanLogRecords.length > 0) {
                     showError("ALREADY USED TODAY", `${student.name} has already entered campus today.`);
                     return;
                 }
 
-                // Rule 3 insertion: Inject matching parameters down inside logging cloud registry index databases
-                const { error: insertError } = await supabase
-                    .from('daily_scans')
-                    .insert([{ scan_key: uniqueScanKey, student_id: decodedText }]);
+                // Rule 3: Insert log registration back inside the online records table index
+                await supabaseFetch('daily_scans', {
+                    method: 'POST',
+                    body: JSON.stringify({ scan_key: uniqueScanKey, student_id: decodedText })
+                });
 
-                if (insertError) throw insertError;
-
-                // Fire presentation layout transitions to paint UI full solid green canvas structure
+                // Display success transformations metrics
                 loadingSpinner.classList.add('hidden');
                 displayScreen.classList.replace('bg-gray-900', 'bg-emerald-600');
                 resultCard.classList.remove('hidden');
                 resetBtn.classList.remove('hidden');
 
-                // Map database profile data values explicitly across placeholder frames text parameters
                 document.getElementById('student-photo').src = student.photo_url;
                 document.getElementById('student-name').innerText = student.name;
                 document.getElementById('student-id').innerText = `ID: ${student.id}`;
                 document.getElementById('student-class').innerText = student.class;
 
             } catch (err) {
-                console.error("System operations cloud platform connection fault exception flags: ", err);
-                showError("NETWORK ERROR", "Failed to connect to the cloud database. Verify active web status connections.");
+                console.error(err);
+                showError("NETWORK ERROR", "Failed to communicate with cloud servers.");
             }
         }
 
@@ -177,7 +171,6 @@
             errorSubtext.innerText = subMessage;
         }
 
-        // Initialize listener monitors handles
         resetBtn.addEventListener('click', startScanning);
         window.addEventListener('DOMContentLoaded', startScanning);
     </script>
