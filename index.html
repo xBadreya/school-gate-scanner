@@ -64,17 +64,17 @@
                 <h1 style="font-size:3rem;">⚠️ Code Crash!</h1>
                 <p style="font-size:1.2rem; margin-top:20px;"><b>Error Detail:</b> ${message}</p>
                 <p style="font-size:1.2rem;"><b>Error Line Number:</b> ${lineno}</p>
-                <p style="margin-top:30px; opacity:0.7;">Double check that your API keys are correctly formatted in quotes.</p>
+                <p style="margin-top:30px; opacity:0.7;">If this is the same error, your mobile browser is cached. Try incognito window!</p>
             </div>`;
             return false;
         };
 
-        // Initialize Supabase Cloud Roster System Connections
+        // Initialize Supabase Cloud Connections
         const SUPABASE_URL = "https://llkiqbiyiibbbbxjuwmy.supabase.co"; 
         const SUPABASE_ANON_KEY = "sb_publishable_iKOVQNSp5jEzcJKz-eym1A_k6eSD4Pq"; // Put your long key inside these quotes
 
-       // Change the "s" to a capital "S" right after the equals sign:
-const supabase = Supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        // Boot client database service instance using capital 'Supabase' object
+        const supabase = Supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
         // Map core layout presentation node targets out from documents DOM
         const displayScreen = document.getElementById('display-screen');
